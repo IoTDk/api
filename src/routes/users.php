@@ -14,19 +14,6 @@ $app = new \Slim\App;
 header("Content-Type: application/json;charset=UTF-8");
 header("Access-Control-Allow-Headers: Content-Type");
 
-
-$app->options('/{routes:.+}', function (Response $request, $response, $args) {
-    return $response;
-});
-
-$app->add(function ($req, $res, $next) {
-    $response = $next($req, $res);
-    return $response
-        ->withHeader('Access-Control-Allow-Origin', '*')
-        ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization')
-        ->withHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-});
-
 //GET ALL USERS
 $app->get('/users', function (Request $request, Response $response) {
     $sql = 'SELECT * FROM users';
@@ -65,9 +52,6 @@ $app->get('/users/{id}', function (Request $request, Response $response) {
 
 //ADD A USER
 $app->post('/users', function (Request $request, Response $response) {
-//    parse_str(file_get_contents("php://input"), $post_vars);
-
-
     $res = json_decode(file_get_contents("php://input"));
     $fname = $res->data->attributes->fname;
     $lname = $res->data->attributes->lname;
@@ -78,6 +62,9 @@ $app->post('/users', function (Request $request, Response $response) {
     $apiPassword = $res->data->attributes->apipassword;
     $sql = "INSERT INTO users (fname, lname, cname, email, password, apiLogin, apiPassword) VALUES (:fname, :lname, :cname, :email, :password, :apiLogin, :apiPassword)";
 
+    $hash_options = ["cost" => 12];
+    $hashed = password_hash($password, PASSWORD_BCRYPT, $hash_options);
+
     try {
         $db = new Database();
         $query = $db->connect();
@@ -86,13 +73,13 @@ $app->post('/users', function (Request $request, Response $response) {
         $stmt->bindParam(':lname', $lname);
         $stmt->bindParam(':cname', $cname);
         $stmt->bindParam(':email', $email);
-        $stmt->bindParam(':password', $password);
+        $stmt->bindParam(':password', $hashed);
         $stmt->bindParam(':apiLogin', $apiLogin);
         $stmt->bindParam(':apiPassword', $apiPassword);
 
         $stmt->execute();
 
-        echo '{"notice": {"text": "User Added"}';
+        echo '{"notice": {"text": "User Added"}}';
     } catch (PDOException $e) {
         echo '{"Error": {"text": ' . $e->getMessage() . '}';
     }
@@ -113,6 +100,7 @@ $app->put('/users/update/{id}', function (Request $request, Response $response) 
 
     $sql = "UPDATE users SET
             fname = :fname,
+            
             lname = :lname,
             cname = :cname,
             email = :email,
