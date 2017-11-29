@@ -11,8 +11,9 @@ use \Psr\Http\Message\ResponseInterface as Response;
 
 $app = new \Slim\App;
 
-header("Content-Type: application/json;charset=UTF-8");
-header("Access-Control-Allow-Headers: Content-Type");
+header("Content-Type: application/json");
+header("Access-Control-Allow-Headers: content-type");
+header("Access-Control-Allow-Origin: *");
 
 //GET ALL USERS
 $app->get('/users', function (Request $request, Response $response) {
@@ -33,6 +34,77 @@ $app->get('/users', function (Request $request, Response $response) {
     }
 });
 
+//Get devices
+$app->post('/devices', function(Request $request, Response $response){
+    $apiLogin = $_POST['login'];
+    $apiPassword = $_POST['password']; //it arrives to PHP and the credentials are OK.
+
+    //GET DEVICE TYPE IDS
+    $furl = 'https://backend.sigfox.com/api/devicetypes';
+    $post = array('login' => $apiLogin, 'password' => $apiPassword);
+    function curl_post($url, $post)
+    {
+        $defaults = array(
+            CURLOPT_POST => 1,
+            CURLOPT_HEADER => 0,
+            CURLOPT_URL => $url,
+            CURLOPT_FRESH_CONNECT => 1,
+            CURLOPT_RETURNTRANSFER => 1,
+            CURLOPT_HTTPHEADER => array("Authorization:Basic NTllMGJmNDU5ZTkzYTE0ZWRiYWY1NDhmOmVhNDc0YzM5MTRmMWFiYTc5NGJlNmZlYzQwOTY5NDEy"),
+            CURLOPT_FORBID_REUSE => 1,
+            CURLOPT_TIMEOUT => 4,
+            CURLOPT_POSTFIELDS => http_build_query($post)
+        );
+        $ch = curl_init();
+        curl_setopt_array($ch, $defaults);
+        $result = curl_exec($ch);
+        if (!$result) {
+            trigger_error(curl_error($ch));
+        }
+        curl_close($ch);
+        return ($result);
+    }
+
+    $result = curl_post($furl, $post);
+    $res = json_decode($result, true);
+
+    $i = 0;
+    $curr_devices = array();
+    foreach($res as $line) {
+        $curr_devices[$i] = array();
+        foreach ($line as $obj) {
+            $curr_devices[$i]['devicetypeid'] = $obj['id'];
+            $curr_devices[$i]['devicetypename'] = $obj['name'];
+            $curr_devices[$i]['devicetypegroup'] = $obj['group'];
+            $curr_devices[$i]['devicetypecontract'] = $obj['contract'];
+            $i++;
+        }
+    }
+
+    //GET ALL DEVICES FROM DEVICE TYPE
+//    $curr_devices[$i]['devices'] = array();
+    $i = 0; $j = 0;
+    while ($curr_devices[$i]) {
+        $surl = 'https://backend.sigfox.com/api/devicetypes/' . $curr_devices[$i]['devicetypeid'] . '/devices'; // -> fills url with appropriate device type id
+        $device_raw = curl_post($surl, $post); //does the request and returns result. ----> Do smthing with this.
+        $device_json = json_decode($device_raw);
+        foreach ($device_json as $lines) {
+            //$curr_devices[$i]['devices'] = array();
+            $j = 0;
+            foreach ($lines as $device) {
+                $curr_devices[$i]['devices'][$j] = $device; //HAVE ALL DEVICE-TYPES AND DEVICES ----> NEED MESSAGES and might be here
+                /*$turl = 'https://backend.sigfox.com/api/devices/' . $curr_devices[$i]['devices'][$j]->id . '/messages?limit=10';
+                $messages_raw = curl_post($turl, $post);
+                $messages_json = json_decode($messages_raw);
+                $curr_devices[$i]['devices'][$j]->messages = $messages_json;*/
+                $j++;
+            }
+        }
+        $i++;
+    }
+    return (json_encode($curr_devices));
+});
+
 //GET SINGLE USER
 $app->get('/users/{id}', function (Request $request, Response $response) {
     $id = $request->getAttribute('id');
@@ -49,6 +121,7 @@ $app->get('/users/{id}', function (Request $request, Response $response) {
         echo '{"Error": {"text": ' . $e->getMessage() . '} }';
     }
 });
+
 
 //ADD A USER
 $app->post('/users', function (Request $request, Response $response) {
@@ -85,6 +158,29 @@ $app->post('/users', function (Request $request, Response $response) {
     }
 });
 
+
+//Auth USER
+$app->post('/auth', function (Request $request, Response $response) {
+    $email = $_POST['email'];
+    $sql = 'SELECT * from users WHERE email = ?';
+
+    try {
+        $db = new Database();
+        $query = $db->connect();
+        $stmt = $query->prepare($sql);
+        $stmt->execute(array($email));
+        $curr_user = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (password_verify($_POST['password'], $curr_user['password']))
+        {
+            print_r(json_encode($curr_user));
+        } else {
+            echo '{"Error": {"text": "Wrong email/password combination"} }';
+        }
+    } catch (PDOException $e) {
+        echo '{"Error": {"text": ' . $e->getMessage() . '} }';
+    }
+});
+
 //UPDATE A USER
 $app->put('/users/update/{id}', function (Request $request, Response $response) {
     $id = $request->getAttribute('id');
@@ -100,7 +196,6 @@ $app->put('/users/update/{id}', function (Request $request, Response $response) 
 
     $sql = "UPDATE users SET
             fname = :fname,
-            
             lname = :lname,
             cname = :cname,
             email = :email,
@@ -128,6 +223,7 @@ $app->put('/users/update/{id}', function (Request $request, Response $response) 
         echo '{"Error": {"text": ' . $e->getMessage() . '}';
     }
 });
+
 
 //DELETE SINGLE USER
 $app->delete('/users/delete/{id}', function (Request $request, Response $response) {
