@@ -27,7 +27,7 @@ How to run tests:
 Do you really want to test this?
 
 Deployment instructions:
-You also need me to tell you have to deploy this? -- Just run your wamp server.
+You also need me to tell you have to deploy this? -- Just run your wamp server. This is server side so you can't see anything from this inside your web app. Only the returned requests of course.
 
 ### Contribution guidelines ###
 
