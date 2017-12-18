@@ -6,6 +6,8 @@
  * Time: 11:08
  */
 
+// holds db credentials and method to connect
+
 class Database {
 
     private $host = "mysql14.gigahost.dk";
