@@ -77,7 +77,6 @@ $app->get('/devices', function(Request $request, Response $response){
         $bhg = 2;
         $result = curl_post_sec($furl, $post);
     } else {
-        echo ('ah bon');
         $result = null;
     }
 

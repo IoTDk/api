@@ -47,7 +47,20 @@ $app->get('/users/{id}', function (Request $request, Response $response) {
         $stmt = $query->query($sql);
         $user = $stmt->fetchAll(PDO::FETCH_OBJ);
         $db = NULL;
-        echo json_encode($user);
+        $compliant = array();
+        $compliant['data'] = new stdClass();
+        $compliant['data']->type = "user";
+        $compliant['data']->attributes = new stdClass();
+        foreach ($user[0] as $key => $value) {
+            switch ($key) {
+                case "id":
+                    $compliant['data']->$key = $value;
+                    break;
+                default:
+                    $compliant['data']->attributes->$key = $value;
+            }
+        }
+        return (json_encode($compliant));
     } catch (PDOException $e) {
         echo '{"Error": {"text": ' . $e->getMessage() . '} }';
     }
@@ -93,6 +106,7 @@ $app->post('/users', function (Request $request, Response $response) {
 //Auth USER
 $app->post('/auth', function (Request $request, Response $response) {
     $email = htmlspecialchars($_POST['email']);
+    $password = htmlspecialchars($_POST['password']);
     $sql = 'SELECT * from users WHERE email = ?';
 
     try {
@@ -101,7 +115,7 @@ $app->post('/auth', function (Request $request, Response $response) {
         $stmt = $query->prepare($sql);
         $stmt->execute(array($email));
         $curr_user = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (password_verify($_POST['password'], $curr_user['password'])) // tests if given password corresponds to password in db.
+        if (password_verify($password, $curr_user['password'])) // tests if given password corresponds to password in db. no isset()??
         {
             print_r(json_encode($curr_user));
         } else {
@@ -113,9 +127,9 @@ $app->post('/auth', function (Request $request, Response $response) {
 });
 
 //UPDATE A USER
-$app->put('/users/update/{id}', function (Request $request, Response $response) {
-    $id = htmlspecialchars($request->getAttribute('id'));
+$app->post('/update', function (Request $request, Response $response) {
     parse_str(file_get_contents("php://input"), $put_vars);
+    $id = htmlspecialchars($put_vars['userid']);
     $fname = htmlspecialchars($put_vars['fname']);
     $lname = htmlspecialchars($put_vars['lname']);
     $cname = htmlspecialchars($put_vars['cname']);
@@ -124,34 +138,63 @@ $app->put('/users/update/{id}', function (Request $request, Response $response) 
     $apiLogin = htmlspecialchars($put_vars['apiLogin']);
     $apiPassword = htmlspecialchars($put_vars['apiPassword']);
 
-
-    $sql = "UPDATE users SET
-            fname = :fname,
-            lname = :lname,
-            cname = :cname,
-            email = :email,
-            password = :password,
-            apiLogin = :apiLogin,
-            apiPassword = :apiPassword
-            WHERE id = $id";
+    switch ($put_vars) {
+        case isset($fname):
+            $sql = "UPDATE users SET fname = :fname WHERE id = $id";
+            $db = new Database();
+            $query = $db->connect();
+            $stmt = $query->prepare($sql);
+            $stmt->bindParam(':fname', $fname);
+            break;
+        case isset($lname):
+            $sql = "UPDATE users SET lname = :lname WHERE id = $id";
+            $db = new Database();
+            $query = $db->connect();
+            $stmt = $query->prepare($sql);
+            $stmt->bindParam(':lname', $lname);
+            break;
+        case isset($cname):
+            $sql = "UPDATE users SET cname = :cname WHERE id = $id";
+            $db = new Database();
+            $query = $db->connect();
+            $stmt = $query->prepare($sql);
+            $stmt->bindParam(':cname', $cname);
+            break;
+        case isset($email):
+            $sql = "UPDATE users SET email = :email WHERE id = $id";
+            $db = new Database();
+            $query = $db->connect();
+            $stmt = $query->prepare($sql);
+            $stmt->bindParam(':email', $email);
+            break;
+        case isset($password):
+            $sql = "UPDATE users SET password = :password WHERE id = $id";
+            $db = new Database();
+            $query = $db->connect();
+            $stmt = $query->prepare($sql);
+            $stmt->bindParam(':password', $password);
+            break;
+        case isset($apiLogin):
+            $sql = "UPDATE users SET apiLogin = :apiLogin WHERE id = $id";
+            $db = new Database();
+            $query = $db->connect();
+            $stmt = $query->prepare($sql);
+            $stmt->bindParam(':apiLogin', $apiLogin);
+            break;
+        case isset($apiPassword):
+            $sql = "UPDATE users SET apiPassword = :apiPassword WHERE id = $id";
+            $db = new Database();
+            $query = $db->connect();
+            $stmt = $query->prepare($sql);
+            $stmt->bindParam(':apiPassword', $apiPassword);
+            break;
+    }
 
     try {
-        $db = new Database();
-        $query = $db->connect();
-        $stmt = $query->prepare($sql);
-        $stmt->bindParam(':fname', $fname);
-        $stmt->bindParam(':lname', $lname);
-        $stmt->bindParam(':cname', $cname);
-        $stmt->bindParam(':email', $email);
-        $stmt->bindParam(':password', $password);
-        $stmt->bindParam(':apiLogin', $apiLogin);
-        $stmt->bindParam(':apiPassword', $apiPassword);
-
         $stmt->execute();
-
-        echo '{"notice": {"text": "User Updated"}';
+        return('{"notice": {"text": "User Updated"}}');
     } catch (PDOException $e) {
-        echo '{"Error": {"text": ' . $e->getMessage() . '}';
+        return('{"Error": {"text": ' . $e->getMessage() . '}');
     }
 });
 
